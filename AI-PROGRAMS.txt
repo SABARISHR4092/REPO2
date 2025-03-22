@@ -1,0 +1,455 @@
+##8_puzzle##
+import heapq
+import numpy as np
+
+class Puzzle:
+    def __init__(self, board, goal):
+        self.board = board
+        self.goal = goal
+        self.n = len(board)
+        self.goal_positions = {self.goal[i][j]: (i, j) for i in range(self.n) for j in range(self.n)}
+
+    def find_blank(self):
+        for i in range(self.n):
+            for j in range(self.n):
+                if self.board[i][j] == 0:
+                    return i, j
+
+    def get_neighbors(self):
+        neighbors = []
+        x, y = self.find_blank()
+        moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        
+        for dx, dy in moves:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.n and 0 <= ny < self.n:
+                new_board = np.copy(self.board)
+                new_board[x][y], new_board[nx][ny] = new_board[nx][ny], new_board[x][y]
+                neighbors.append(Puzzle(new_board, self.goal))
+        
+        return neighbors
+
+    def heuristic(self):
+        h = 0
+        for i in range(self.n):
+            for j in range(self.n):
+                if self.board[i][j] != 0:
+                    goal_x, goal_y = self.goal_positions[self.board[i][j]]
+                    h += abs(goal_x - i) + abs(goal_y - j)
+        return h
+
+    def is_goal(self):
+        return np.array_equal(self.board, self.goal)
+    
+    def __lt__(self, other):
+        return self.heuristic() < other.heuristic()
+
+def a_star(start, goal):
+    open_list = []
+    heapq.heappush(open_list, (start.heuristic(), start))
+    came_from = {}
+    g_score = {tuple(map(tuple, start.board)): 0}
+    f_score = {tuple(map(tuple, start.board)): start.heuristic()}
+
+    while open_list:
+        _, current = heapq.heappop(open_list)
+
+        if current.is_goal():
+            path = []
+            while current in came_from:
+                path.append(current.board)
+                current = came_from[current]
+            path.append(start.board)
+            return path[::-1]
+
+        for neighbor in current.get_neighbors():
+            neighbor_tuple = tuple(map(tuple, neighbor.board))
+            tentative_g_score = g_score[tuple(map(tuple, current.board))] + 1
+
+            if neighbor_tuple not in g_score or tentative_g_score < g_score[neighbor_tuple]:
+                came_from[neighbor] = current
+                g_score[neighbor_tuple] = tentative_g_score
+                f_score[neighbor_tuple] = tentative_g_score + neighbor.heuristic()
+                heapq.heappush(open_list, (f_score[neighbor_tuple], neighbor))
+    
+    return None
+
+start_state = np.array([[1, 2, 3], [4, 0, 5], [7, 8, 6]])
+goal_state = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 0]])
+
+start_puzzle = Puzzle(start_state, goal_state)
+solution = a_star(start_puzzle, goal_state)
+
+if solution:
+    for step in solution:
+        print(np.array(step), '\n')
+else:
+    print("No solution found.")
+
+
+##8QUEENSPROBLEM##
+def print_board(board):
+    for row in board:
+        print(" ".join("Q" if col else "_" for col in row))
+    print("\n")
+
+def is_safe(board, row, col, n):
+    # Check column
+    for i in range(row):
+        if board[i][col]:
+            return False
+    
+    # Check upper left diagonal
+    for i, j in zip(range(row, -1, -1), range(col, -1, -1)):
+        if board[i][j]:
+            return False
+    
+    # Check upper right diagonal
+    for i, j in zip(range(row, -1, -1), range(col, n)):
+        if board[i][j]:
+            return False
+    
+    return True
+
+def solve_n_queens(board, row, n):
+    if row == n:
+        print_board(board)
+        return True
+    
+    for col in range(n):
+        if is_safe(board, row, col, n):
+            board[row][col] = 1
+            solve_n_queens(board, row + 1, n)
+            board[row][col] = 0  # Backtrack
+    
+    return False
+
+def eight_queens():
+    n = 8
+    board = [[0] * n for _ in range(n)]
+    solve_n_queens(board, 0, n)
+
+eight_queens()
+
+
+##Water Jug Problem##
+from collections import deque
+
+def water_jug_bfs(jug1_capacity, jug2_capacity, target):
+    visited = set()
+    queue = deque([(0, 0)])  # Start with both jugs empty
+    
+    while queue:
+        jug1, jug2 = queue.popleft()
+        
+        if (jug1, jug2) in visited:
+            continue
+        
+        visited.add((jug1, jug2))
+        print(f"Jug1: {jug1}L, Jug2: {jug2}L")
+        
+        if jug1 == target or jug2 == target:
+            print("Reached the target!")
+            return
+        
+        # Possible actions
+        possible_states = [
+            (jug1_capacity, jug2),  # Fill Jug1
+            (jug1, jug2_capacity),  # Fill Jug2
+            (0, jug2),  # Empty Jug1
+            (jug1, 0),  # Empty Jug2
+            (max(0, jug1 - (jug2_capacity - jug2)), min(jug2_capacity, jug2 + jug1)),  # Pour Jug1 -> Jug2
+            (min(jug1_capacity, jug1 + jug2), max(0, jug2 - (jug1_capacity - jug1)))   # Pour Jug2 -> Jug1
+        ]
+        
+        for state in possible_states:
+            if state not in visited:
+                queue.append(state)
+    
+    print("No solution found!")
+
+# Example: Jug1 = 4L, Jug2 = 3L, Target = 2L
+water_jug_bfs(4, 3, 2)
+
+
+##Crypt-Arithmetic Problem##
+from itertools import permutations
+
+def solve_cryptarithmetic():
+    letters = set("SENDMOREMONEY")  # Unique letters in the equation
+    if len(letters) > 10:
+        print("Too many unique letters to solve.")
+        return
+    
+    letters = list(letters)
+    for perm in permutations(range(10), len(letters)):
+        mapping = dict(zip(letters, perm))
+        
+        # Ensure no leading zeros
+        if mapping['S'] == 0 or mapping['M'] == 0:
+            continue
+        
+        send = mapping['S'] * 1000 + mapping['E'] * 100 + mapping['N'] * 10 + mapping['D']
+        more = mapping['M'] * 1000 + mapping['O'] * 100 + mapping['R'] * 10 + mapping['E']
+        money = mapping['M'] * 10000 + mapping['O'] * 1000 + mapping['N'] * 100 + mapping['E'] * 10 + mapping['Y']
+        
+        if send + more == money:
+            print(f"Solution found: {mapping}")
+            print(f"{send} + {more} = {money}")
+            return
+    
+    print("No solution found.")
+
+solve_cryptarithmetic()
+
+
+##Missionaries & Cannibals
+from collections import deque
+
+def is_valid(state):
+    m_left, c_left, boat, m_right, c_right = state
+    
+    if m_left < 0 or c_left < 0 or m_right < 0 or c_right < 0:
+        return False
+    
+    if (m_left > 0 and m_left < c_left) or (m_right > 0 and m_right < c_right):
+        return False
+    
+    return True
+
+def bfs():
+    start = (3, 3, 1, 0, 0)  # (Missionaries left, Cannibals left, Boat side, Missionaries right, Cannibals right)
+    goal = (0, 0, 0, 3, 3)
+    queue = deque([(start, [])])  # (State, Path)
+    visited = set()
+    
+    moves = [(1, 0), (2, 0), (0, 1), (0, 2), (1, 1)]  # Possible boat moves
+    
+    while queue:
+        state, path = queue.popleft()
+        
+        if state in visited:
+            continue
+        visited.add(state)
+        
+        if state == goal:
+            for step in path + [state]:
+                print(step)
+            return
+        
+        m_left, c_left, boat, m_right, c_right = state
+        
+        for m, c in moves:
+            if boat == 1:
+                new_state = (m_left - m, c_left - c, 0, m_right + m, c_right + c)
+            else:
+                new_state = (m_left + m, c_left + c, 1, m_right - m, c_right - c)
+            
+            if is_valid(new_state):
+                queue.append((new_state, path + [state]))
+    
+    print("No solution found.")
+
+bfs()
+
+##Vaccum cleaner Problem##
+from collections import deque
+
+def is_goal(grid):
+    for row in grid:
+        if 1 in row:
+            return False
+    return True
+
+def get_neighbors(state, grid):
+    x, y = state
+    moves = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Right, Left, Down, Up
+    neighbors = []
+    
+    for dx, dy in moves:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < len(grid) and 0 <= ny < len(grid[0]):
+            neighbors.append((nx, ny))
+    
+    return neighbors
+
+def vacuum_cleaner(grid, start):
+    queue = deque([(start, grid, [])])  # (Position, Grid, Path)
+    visited = set()
+    
+    print(f"Starting at: {start}")
+    
+    while queue:
+        (x, y), grid, path = queue.popleft()
+        
+        if (x, y) in visited:
+            continue
+        visited.add((x, y))
+        
+        if grid[x][y] == 1:
+            grid[x][y] = 0  # Clean the spot
+            print(f"Cleaning: ({x},{y})")
+        
+        if is_goal(grid):
+            print("Cleaning complete!")
+            return
+        
+        for neighbor in get_neighbors((x, y), grid):
+            queue.append((neighbor, [row[:] for row in grid], path + [(x, y)]))
+            print(f"Moving to: {neighbor}")
+    
+    print("No solution found.")
+
+# Example 3x3 grid: 1 represents dirt, 0 is clean
+grid = [
+    [1, 0, 1],
+    [0, 1, 0],
+    [1, 0, 1]
+]
+
+start_position = (1, 1)  # Vacuum starts at the center
+vacuum_cleaner(grid, start_position)
+
+##BFS Problem##
+from collections import deque
+
+def bfs(graph, start):
+    visited = set()
+    queue = deque([start])
+    
+    while queue:
+        node = queue.popleft()
+        
+        if node not in visited:
+            print(node, end=" ")  # Process the node
+            visited.add(node)
+            
+            for neighbor in graph.get(node, []):
+                if neighbor not in visited:
+                    queue.append(neighbor)
+
+# Example graph represented as an adjacency list
+graph = {
+    'A': ['B', 'C'],
+    'B': ['D', 'E'],
+    'C': ['F'],
+    'D': [],
+    'E': ['F'],
+    'F': []
+}
+
+# Start BFS from node 'A'
+bfs(graph, 'A')
+
+##DFS PROBLEM##
+def dfs(graph, node, visited=None):
+    if visited is None:
+        visited = set()
+    
+    if node not in visited:
+        print(node, end=" ")  # Process the node
+        visited.add(node)
+        
+        for neighbor in graph.get(node, []):
+            dfs(graph, neighbor, visited)
+
+# Example graph represented as an adjacency list
+graph = {
+    'A': ['B', 'C'],
+    'B': ['D', 'E'],
+    'C': ['F'],
+    'D': [],
+    'E': ['F'],
+    'F': []
+}
+
+# Start DFS from node 'A'
+dfs(graph, 'A')
+
+##TRAVELLING SALESMAN PROBLEM##
+from itertools import permutations
+
+def tsp(graph, start):
+    nodes = list(graph.keys())
+    nodes.remove(start)
+    min_cost = float('inf')
+    best_path = []
+    
+    for perm in permutations(nodes):
+        current_cost = 0
+        current_path = [start] + list(perm) + [start]
+        
+        for i in range(len(current_path) - 1):
+            current_cost += graph[current_path[i]][current_path[i + 1]]
+        
+        if current_cost < min_cost:
+            min_cost = current_cost
+            best_path = current_path
+    
+    return best_path, min_cost
+
+# Example graph as an adjacency matrix
+graph = {
+    'A': {'A': 0, 'B': 10, 'C': 15, 'D': 20},
+    'B': {'A': 10, 'B': 0, 'C': 35, 'D': 25},
+    'C': {'A': 15, 'B': 35, 'C': 0, 'D': 30},
+    'D': {'A': 20, 'B': 25, 'C': 30, 'D': 0}
+}
+
+start_node = 'A'
+best_path, min_cost = tsp(graph, start_node)
+print(f"Best Path: {' -> '.join(best_path)}")
+print(f"Minimum Cost: {min_cost}")
+
+##A* ALGORITHM PROBLEM##
+import heapq
+
+def a_star(graph, start, goal, heuristic):
+    open_set = []  # Priority queue
+    heapq.heappush(open_set, (0, start))  # (cost, node)
+    came_from = {}
+    g_score = {node: float('inf') for node in graph}
+    g_score[start] = 0
+    f_score = {node: float('inf') for node in graph}
+    f_score[start] = heuristic[start]
+    
+    while open_set:
+        current_cost, current = heapq.heappop(open_set)
+        
+        if current == goal:
+            path = []
+            while current in came_from:
+                path.append(current)
+                current = came_from[current]
+            path.append(start)
+            return path[::-1], g_score[goal]
+        
+        for neighbor, cost in graph[current].items():
+            tentative_g_score = g_score[current] + cost
+            if tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = g_score[neighbor] + heuristic[neighbor]
+                heapq.heappush(open_set, (f_score[neighbor], neighbor))
+    
+    return None, float('inf')
+
+# Example graph and heuristic
+graph = {
+    'A': {'B': 1, 'C': 4},
+    'B': {'A': 1, 'C': 2, 'D': 5},
+    'C': {'A': 4, 'B': 2, 'D': 1},
+    'D': {'B': 5, 'C': 1}
+}
+
+heuristic = {'A': 7, 'B': 6, 'C': 2, 'D': 0}  # Estimated cost to goal
+
+start_node = 'A'
+goal_node = 'D'
+path, cost = a_star(graph, start_node, goal_node, heuristic)
+print(f"Shortest Path: {' -> '.join(path)}")
+print(f"Total Cost: {cost}")
+
+
+##
+
